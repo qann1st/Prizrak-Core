@@ -12,6 +12,7 @@ import (
 	"github.com/metacubex/mihomo/common/structure"
 	"github.com/metacubex/mihomo/transport/finalmask"
 	"github.com/metacubex/mihomo/transport/finalmask/custom"
+	"github.com/metacubex/mihomo/transport/finalmask/fake"
 	"github.com/metacubex/mihomo/transport/finalmask/fragment"
 	"github.com/metacubex/mihomo/transport/finalmask/noise"
 	"github.com/metacubex/mihomo/transport/finalmask/sudoku"
@@ -157,7 +158,7 @@ func BuildTCPMask(entry map[string]any) (finalmask.TCPMask, error) {
 			return nil, err
 		}
 		return xmc.New(o)
-	case "mkcp-legacy", "salamander", "realm", "noise", "udphop", "xdns", "xicmp":
+	case "mkcp-legacy", "salamander", "realm", "noise", "fake", "udphop", "xdns", "xicmp":
 		return nil, fmt.Errorf("finalmask: %s is not a TCP mask", typ)
 	default:
 		return nil, fmt.Errorf("finalmask: unknown TCP mask %q, want fragment, header-custom, sudoku or xmc", typ)
@@ -176,6 +177,12 @@ func BuildUDPMask(entry map[string]any) (finalmask.UDPMask, error) {
 			return nil, err
 		}
 		return noise.New(o)
+	case "fake":
+		var o fake.Option
+		if err := decodeMask(settings, &o); err != nil {
+			return nil, err
+		}
+		return fake.New(o)
 	case "header-custom":
 		var o custom.UDPOption
 		if err := decodeMask(settings, &o); err != nil {
@@ -220,7 +227,7 @@ func BuildUDPMask(entry map[string]any) (finalmask.UDPMask, error) {
 	case "fragment", "xmc":
 		return nil, fmt.Errorf("finalmask: %s is not a UDP mask", typ)
 	default:
-		return nil, fmt.Errorf("finalmask: unknown UDP mask %q, want noise, header-custom, sudoku, udphop, xdns or xicmp", typ)
+		return nil, fmt.Errorf("finalmask: unknown UDP mask %q, want fake, noise, header-custom, sudoku, udphop, xdns or xicmp", typ)
 	}
 }
 

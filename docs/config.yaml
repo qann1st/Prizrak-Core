@@ -1946,6 +1946,69 @@ proxies: # socks5
       # wait: interval     # interval: 段间按 interval 暂停（默认）；ack: 等对端确认后再发下一段（同 sing-box）
       #                    # interval: pause for interval (default); ack: wait for the peer's ACK before the next piece (as sing-box)
       # fallback-delay: 500 # wait: ack 无法获知确认时的等待（毫秒）/ delay in ms where wait: ack can't see the ACK
+    # finalmask: 可选的掩码链，与 vless/trojan 的 finalmask 写法相同
+    # finalmask: optional mask chain, written as the finalmask of vless/trojan
+    #   只把需要伪装的 UDP 流量用规则（NETWORK,UDP + DST-PORT）路由到本代理，
+    #   否则所有经过它的 UDP 都会先发假包。
+    #   Route only the UDP traffic you want disguised here (rules on NETWORK,UDP and
+    #   DST-PORT); every UDP flow through this proxy sends the decoys otherwise.
+    #   tcp 包住 TCP 流（fragment 就是其中一种掩码）；udp 包住 UDP 包套接字
+    #   tcp wraps the TCP stream (fragment above is one such mask); udp wraps the UDP packet socket
+    finalmask:
+      udp:
+        # fake: 先发若干个假包再发真包，让跟踪 UDP 流的 DPI 按假包分类，
+        #       绕过 QUIC / Discord 语音 / STUN / 游戏流量的检测，同 zapret 的 --dpi-desync=fake。
+        #       首个真包后即可恢复直发，无需一直伪装。
+        # fake: send decoy datagrams before the real one, so a DPI that follows UDP
+        #       flows classifies the fake payload while the peer answers the real one;
+        #       the same idea as zapret's --dpi-desync=fake.
+        - type: fake
+          repeats: 6        # 每个真包前发几个假包 / decoys before each real datagram
+          cutoff: 1         # 只对每个目标的前 N 个数据报伪装；0 表示一直伪装 / desync the first N datagrams per destination, 0 for all
+          ttl: 3            # 假包的 IP TTL，0 表示不修改（假包也会到达对端）/ TTL of the decoys, 0 leaves it alone (they reach the peer too)
+          delay: 0-1        # 假包之间的随机间隔（毫秒）/ random pause between decoys in ms
+          payloads:
+            # 按目标端口选择第一个匹配的载荷；不写 ports 表示任何端口；
+            # 一个载荷都不写时把真包重复一遍当作假包。
+            # The first payload whose ports match is used; no ports matches any port;
+            # with no payload at all the real datagram itself is repeated as the fake.
+            - builtin: discord-udp     # 内置载荷，无需文件 / built-in payload, no files needed
+              ports: "19294-19344,50000-50100"
+            # 内置载荷 / built-in payloads: discord-udp, discord, quic, stun, dtls
+            # - hex: "c300000001"          # 十六进制假载荷 / hex decoy bytes
+            #   ports: "443"
+            # - file: ./quic_initial.bin   # 从文件读取，相对配置目录 / from a file, relative to the config directory
+            #   ports: "443"
+            # - base64: "3q2+7w=="       # base64 字节 / base64 bytes
+            # - text: "hello"            # 文本 / literal text
+            # - packet: [1, 2, 3]        # 字节列表，或配合 type: str|hex|base64 / byte list, or with type: str|hex|base64
+            - random: "64-120"           # 每次随机长度的新字节 / fresh random bytes of a random length
+    # zapret: 包级 TCP/UDP десинк как в zapret (только Windows, WinDivert)
+    # zapret: packet-level TCP/UDP desync as zapret (Windows only, WinDivert)
+    #   Требует WinDivert.dll и WinDivert64.sys рядом с exe, запуск от администратора.
+    #   Requires WinDivert.dll and WinDivert64.sys next to the exe and Administrator rights.
+    #   На других ОС блок игнорируется, работает обычный fragment/finalmask.
+    #   On other OSes the block is ignored and fragment/finalmask keep working.
+    #   На Windows zapret заменяет fragment/finalmask, если они заданы вместе.
+    #   On Windows zapret overrides fragment/finalmask when both are set.
+    # zapret:
+    #   tcp:
+    #     - ports: "443,2053,2083,2087,2096,8443"
+    #       desync: "fake,multisplit"   # zapret ALT11 TCP
+    #       split-pos: "1"
+    #       seqovl: 681
+    #       repeats: 8
+    #       cutoff: 1
+    #       ttl: 3
+    #       fooling: ts                  # ts/ttl -> низкий TTL фейка; none -> не менять
+    #       fake-tls: builtin:tls-google
+    #   udp:
+    #     - ports: "19294-19344,50000-50100"
+    #       desync: "fake"
+    #       repeats: 6
+    #       cutoff: 4
+    #       ttl: 3
+    #       fake: builtin:discord-udp
     sockopt:
       # 不支持的选项会跳过并在日志中警告 / an unsupported option is skipped with a warning in the log
       tcp-congestion: bbr          # 仅 Linux/Android / Linux and Android only

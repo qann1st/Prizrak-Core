@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/metacubex/mihomo/transport/finalmask/custom"
+	"github.com/metacubex/mihomo/transport/finalmask/fake"
 	"github.com/metacubex/mihomo/transport/finalmask/fragment"
 	"github.com/metacubex/mihomo/transport/finalmask/noise"
 	"github.com/metacubex/mihomo/transport/finalmask/sudoku"
@@ -34,6 +35,7 @@ func TestParse(t *testing.T) {
 		},
 		UDP: []map[string]any{
 			{"type": "noise", "noise": []any{map[string]any{"type": "exp", "packet": "<b 0d0a> <r 16>"}}},
+			{"type": "fake", "repeats": "3", "cutoff": "1", "ttl": "4", "payloads": []any{map[string]any{"hex": "c0ffee", "ports": "50000-50100"}, map[string]any{"random": "64-120"}}},
 			{"type": "header-custom", "mode": "standalone", "client": []any{map[string]any{"rand": 4, "capture": "txid"}}, "server": []any{map[string]any{"reuse": "txid"}}},
 			{"type": "sudoku", "password": "p"},
 			{"type": "udphop", "mode": "intervalLocal", "interval": "10-20"},
@@ -94,6 +96,7 @@ func TestRejects(t *testing.T) {
 		"no type":        {TCP: []map[string]any{{"packets": "tlshello"}}},
 		"unknown tcp":    {TCP: []map[string]any{{"type": "nope"}}},
 		"udp as tcp":     {TCP: []map[string]any{{"type": "noise"}}},
+		"fake as tcp":    {TCP: []map[string]any{{"type": "fake"}}},
 		"tcp as udp":     {UDP: []map[string]any{{"type": "fragment"}}},
 		"mkcp dropped":   {UDP: []map[string]any{{"type": "mkcp-legacy"}}},
 		"salamander":     {UDP: []map[string]any{{"type": "salamander", "password": "x"}}},
@@ -122,6 +125,7 @@ func TestRegistryTypes(t *testing.T) {
 		{map[string]any{"type": "header-custom"}, &custom.TCPConfig{}, false},
 		{map[string]any{"type": "sudoku"}, &sudoku.Config{}, false},
 		{map[string]any{"type": "noise"}, &noise.Config{}, true},
+		{map[string]any{"type": "fake"}, &fake.Config{}, true},
 		{map[string]any{"type": "header-custom"}, &custom.UDPConfig{}, true},
 		{map[string]any{"type": "header-custom", "mode": "standalone"}, &custom.UDPStandaloneConfig{}, true},
 		{map[string]any{"type": "sudoku"}, &sudoku.Config{}, true},
