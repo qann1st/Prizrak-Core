@@ -465,8 +465,13 @@ func xrayTransport(proxy, stream map[string]any, protocol string) error {
 				query := pathURL.Query()
 				if earlyData := query.Get("ed"); earlyData != "" {
 					if med, err := strconv.Atoi(earlyData); err == nil {
-						wsOpts["max-early-data"] = med
-						wsOpts["early-data-header-name"] = "Sec-WebSocket-Protocol"
+						switch network {
+						case "ws":
+							wsOpts["max-early-data"] = med
+							wsOpts["early-data-header-name"] = "Sec-WebSocket-Protocol"
+						case "httpupgrade":
+							wsOpts["v2ray-http-upgrade-fast-open"] = true
+						}
 						query.Del("ed")
 						pathURL.RawQuery = query.Encode()
 						path = pathURL.String()
@@ -480,7 +485,6 @@ func xrayTransport(proxy, stream map[string]any, protocol string) error {
 		}
 		if network == "httpupgrade" {
 			wsOpts["v2ray-http-upgrade"] = true
-			wsOpts["v2ray-http-upgrade-fast-open"] = true
 		}
 		wsOpts["headers"] = headers
 		proxy["network"] = "ws"
