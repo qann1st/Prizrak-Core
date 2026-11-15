@@ -36,11 +36,9 @@ jobs:
     strategy:
       matrix:
         jobs:
-          # Windows-only release artifacts. The three current targets match
-          # the supported release builds: compatible x64, x64-v3 and ARM64.
+          # Windows AMD64-only release artifacts: compatible x64 and x64-v3.
           - { goos: windows, goarch: amd64, goamd64: v1, output: amd64-compatible }
           - { goos: windows, goarch: amd64, goamd64: v3, output: amd64-v3 }
-          - { goos: windows, goarch: arm64, output: arm64 }
     steps:
     - uses: actions/checkout@v6
 
