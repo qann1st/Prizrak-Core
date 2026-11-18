@@ -32,11 +32,11 @@ func newBackend() (backend, error) {
 	}
 	// Install/verify the driver once, so a missing driver or missing
 	// Administrator rights fail at config load instead of per connection.
-	probe, err := wd.open("false")
+	probe, err := wd.Open("false")
 	if err != nil {
 		return nil, fmt.Errorf("WinDivertOpen: %w (run as Administrator and put WinDivert.dll + WinDivert64.sys next to the exe)", err)
 	}
-	_ = wd.close(probe)
+	_ = wd.Close(probe)
 	return &winBackend{wd: wd, flows: make(map[*flow]*windivertFlow)}, nil
 }
 
@@ -53,13 +53,13 @@ func (b *winBackend) openFlow(proto string, local, remote netip.AddrPort, f *flo
 	if err != nil {
 		return nil, err
 	}
-	handle, err := b.wd.open(filter)
+	handle, err := b.wd.Open(filter)
 	if err != nil {
 		// A simpler filter avoids address-syntax differences between
 		// WinDivert builds; the 5-tuple check still happens in userspace.
 		simple := fmt.Sprintf("outbound and %s and %s.SrcPort == %d and %s.DstPort == %d",
 			proto, proto, local.Port(), proto, remote.Port())
-		handle, err = b.wd.open(simple)
+		handle, err = b.wd.Open(simple)
 		if err != nil {
 			return nil, fmt.Errorf("WinDivertOpen(%q): %w", filter, err)
 		}
@@ -84,7 +84,7 @@ func (h *windivertFlow) loop() {
 	buf := make([]byte, 65535)
 	addr := &windivertAddress{}
 	for {
-		n, err := h.backend.wd.recv(h.handle, buf, addr)
+		n, err := h.backend.wd.Recv(h.handle, buf, addr)
 		if err != nil {
 			log.Debugln("[zapret] recv: %v", err)
 			return
@@ -98,10 +98,10 @@ func (h *windivertFlow) loop() {
 			a, _ := p.addr.(*windivertAddress)
 			if p.crafted && a != nil {
 				copyAddr := *a
-				copyAddr.setChecksums(isIPv6(p.data), isTCP(p.data))
+				copyAddr.MarkCrafted(isIPv6(p.data), isTCP(p.data))
 				a = &copyAddr
 			}
-			if err := h.backend.wd.send(h.handle, p.data, a); err != nil {
+			if err := h.backend.wd.Send(h.handle, p.data, a); err != nil {
 				failed = true
 				log.Debugln("[zapret] send: %v", err)
 			}
@@ -112,7 +112,7 @@ func (h *windivertFlow) loop() {
 					continue
 				}
 				a, _ := p.addr.(*windivertAddress)
-				if err := h.backend.wd.send(h.handle, p.data, a); err != nil {
+				if err := h.backend.wd.Send(h.handle, p.data, a); err != nil {
 					log.Debugln("[zapret] send fallback: %v", err)
 				}
 			}
@@ -126,7 +126,7 @@ func (h *windivertFlow) close() error {
 		h.backend.mu.Lock()
 		delete(h.backend.flows, h.flow)
 		h.backend.mu.Unlock()
-		err = h.backend.wd.close(h.handle)
+		err = h.backend.wd.Close(h.handle)
 	})
 	return err
 }

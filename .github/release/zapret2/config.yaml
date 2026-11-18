@@ -2,5 +2,26 @@ mixed-port: 17890
 allow-lan: false
 bind-address: 127.0.0.1
 mode: rule
+proxies:
+  - name: ZAPRET2
+    type: freedom
+    zapret2:
+      tcp-ports: [443]
+      udp-ports: [443]
+      options:
+        - "--filter-tcp=443"
+        - "--filter-l7=tls"
+        - "--hostlist-domains=youtube.com,youtube-nocookie.com,googlevideo.com,ytimg.com,youtubei.googleapis.com"
+        - "--out-range=-d10"
+        - "--payload=tls_client_hello"
+        - "--lua-desync=fake:blob=fake_default_tls:tcp_md5:repeats=11:tls_mod=rnd,dupsid,sni=www.google.com"
+        - "--lua-desync=multidisorder:pos=1,midsld"
+        - "--new"
+        - "--blob=quic_google:@/files/quic_initial_www_google_com.bin"
+        - "--filter-udp=443"
+        - "--filter-l7=quic"
+        - "--hostlist-domains=youtube.com,youtube-nocookie.com,googlevideo.com,ytimg.com,youtubei.googleapis.com"
+        - "--payload=quic_initial"
+        - "--lua-desync=fake:blob=quic_google:repeats=11"
 rules:
-  - MATCH,DIRECT
+  - MATCH,ZAPRET2

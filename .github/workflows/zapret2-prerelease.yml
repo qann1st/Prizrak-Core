@@ -28,26 +28,50 @@ jobs:
         with:
           go-download-base-url: https://github.com/MetaCubeX/go/releases/download/build
           go-version: '1.26'
+      - name: Build embedded zapret2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libbsd-dev
+          bash transport/zapret2/build/build.sh "$RUNNER_TEMP/zapret2-licenses"
+          go test -tags with_zapret2 ./transport/zapret2
+      - name: Download pinned WinDivert
+        run: |
+          curl --retry 3 -fLsS -o "$RUNNER_TEMP/windivert.zip" \
+            https://github.com/basil00/WinDivert/releases/download/v2.2.2/WinDivert-2.2.2-A.zip
+          printf '%s  %s\n' '63cb41763bb4b20f600b6de04e991a9c2be73279e317d4d82f237b150c5f3f15' \
+            "$RUNNER_TEMP/windivert.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/windivert.zip" -d "$RUNNER_TEMP"
       - name: Build and package Windows x64
         run: |
           cp /etc/ssl/certs/ca-certificates.crt component/ca/ca-certificates.crt
           mkdir -p dist "$RUNNER_TEMP/zapret2-package"
           package="$RUNNER_TEMP/zapret2-package"
           cp .github/release/zapret2/* LICENSE "$package/"
+          cp -R "$RUNNER_TEMP/zapret2-licenses" "$package/licenses"
+          driver="$RUNNER_TEMP/WinDivert-2.2.2-A"
+          cp "$driver/x64/WinDivert.dll" "$driver/x64/WinDivert64.sys" "$package/"
+          cp "$driver/LICENSE" "$package/licenses/WinDivert.txt"
           build_time=$(date -u)
           for variant in compatible v3; do
             goamd64=v1
             if [[ "$variant" == v3 ]]; then goamd64=v3; fi
-            GOOS=windows GOARCH=amd64 GOAMD64="$goamd64" go build -tags with_gvisor -trimpath \
+            GOOS=windows GOARCH=amd64 GOAMD64="$goamd64" go build -tags 'with_gvisor with_zapret2' -trimpath \
               -ldflags "-X 'github.com/metacubex/mihomo/constant.Version=$RELEASE_TAG' -X 'github.com/metacubex/mihomo/constant.BuildTime=$build_time' -s -w -buildid=" \
               -o "$package/prizrak-core.exe" .
-            (cd "$package" && zip -q "$GITHUB_WORKSPACE/dist/prizrak-core-windows-amd64-$variant-$RELEASE_TAG.zip" ./*)
+            (cd "$package" && zip -qr "$GITHUB_WORKSPACE/dist/prizrak-core-windows-amd64-$variant-$RELEASE_TAG.zip" ./*)
           done
           (cd dist && sha256sum ./*.zip > checksums.txt)
+          GOOS=windows GOARCH=amd64 GOAMD64=v1 go test -tags with_zapret2 -c \
+            -o "$RUNNER_TEMP/zapret2.test.exe" ./transport/zapret2
       - uses: actions/upload-artifact@v7
         with:
           name: windows-zapret2
           path: dist/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-zapret2-tests
+          path: ${{ runner.temp }}/zapret2.test.exe
           if-no-files-found: error
 
   smoke-test:
@@ -57,21 +81,23 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: windows-zapret2
-      - name: Validate Prizrak-Core and winws2 configuration
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-zapret2-tests
+      - name: Validate Prizrak-Core YAML and exercise embedded engine on loopback
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $archive = "prizrak-core-windows-amd64-compatible-$env:RELEASE_TAG.zip"
           $testDirectory = Join-Path $env:RUNNER_TEMP 'zapret2 smoke test'
           Expand-Archive -LiteralPath $archive -DestinationPath $testDirectory
+          Copy-Item -LiteralPath zapret2.test.exe -Destination $testDirectory
           Set-Location -LiteralPath $testDirectory
           & .\prizrak-core.exe -t -d . -f config.yaml
           if ($LASTEXITCODE -ne 0) { throw 'Prizrak-Core configuration test failed' }
-          & .\setup-zapret2.ps1
-          $profile = Get-Content -LiteralPath youtube-winws2.txt -Raw
-          Set-Content -LiteralPath dry-run.txt -Encoding ascii -Value "--dry-run`n$profile"
-          & .\zapret2-v1.0.7\binaries\windows-x86_64\winws2.exe '@dry-run.txt'
-          if ($LASTEXITCODE -ne 0) { throw 'winws2 configuration test failed' }
+          $env:PRIZRAK_ZAPRET2_WIN_SMOKE = '1'
+          & .\zapret2.test.exe -test.v
+          if ($LASTEXITCODE -ne 0) { throw 'Embedded zapret2 loopback test failed' }
 
   publish:
     needs: [build, smoke-test]
@@ -89,5 +115,5 @@ jobs:
           sha256sum -c checksums.txt
           gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --prerelease --latest=false --title "Prizrak-Core + zapret2 ($RELEASE_TAG)" \
-            --notes 'Тестовая сборка Windows x64. В ZIP есть README, профиль YouTube для TLS и QUIC и скрипт установки официального zapret2 v1.0.7 с проверкой SHA-256. winws2 запускается отдельным процессом. Для первого теста скачайте ZIP с compatible.' \
+            --notes 'Тестовая сборка Windows x64 со встроенным движком zapret2 v1.0.7. Стратегии задаются в proxies[].zapret2.options в config.yaml. В ZIP есть WinDivert, профиль YouTube для TLS и QUIC и инструкция. Для первого теста скачайте ZIP с compatible.' \
             ./*.zip checksums.txt

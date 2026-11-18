@@ -2039,6 +2039,9 @@ proxies: # socks5
             - random: "64-120"           # 每次随机长度的新字节 / fresh random bytes of a random length
     # zapret: 包级 TCP/UDP десинк как в zapret (только Windows, WinDivert)
     # zapret: packet-level TCP/UDP desync as zapret (Windows only, WinDivert)
+    # On Windows x64 builds with with_zapret2, an independent embedded zapret2
+    # engine can be configured instead. See .github/release/zapret2/config.yaml
+    # for a freedom outbound with zapret2.options and separate capture ports.
     #   Требует WinDivert.dll и WinDivert64.sys рядом с exe, запуск от администратора.
     #   Requires WinDivert.dll and WinDivert64.sys next to the exe and Administrator rights.
     #   На других ОС блок игнорируется, работает обычный fragment/finalmask.

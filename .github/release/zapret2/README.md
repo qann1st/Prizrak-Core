@@ -1,10 +1,13 @@
-# Prizrak-Core с zapret2 для Windows x64
+# Prizrak-Core со встроенным zapret2
 
-1. Распакуйте ZIP. В PowerShell из этой папки выполните `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup-zapret2.ps1`. Скрипт скачает [официальный zapret2 v1.0.7](https://github.com/bol-van/zapret2/releases/tag/v1.0.7), проверит SHA-256 и распакует его рядом. Для установки из уже скачанного ZIP укажите `-ArchivePath` с путём к нему.
-2. Остановите прежний zapret и другие процессы перехвата трафика. В командной строке, запущенной от имени администратора, выполните `start-zapret2.cmd` из распакованной папки. `winws2` работает отдельно от Prizrak-Core, а `Ctrl+C` в его окне останавливает обработку.
-3. Проверьте загрузку и перемотку видео на YouTube. Для проверки QUIC откройте YouTube напрямую в браузере с включённым HTTP/3 и проверьте `h3` в колонке Protocol в DevTools → Network. Для сравнения повторите тест после остановки `winws2`, используя новые соединения.
-4. Для проверки через Prizrak-Core запустите `prizrak-core.exe -f config.yaml` в отдельном обычном терминале и укажите в браузере локальный HTTP-прокси `127.0.0.1:17890`. Этот путь проверяет TLS по TCP. Тестовый YAML использует `DIRECT`, поэтому трафик до YouTube виден `winws2`.
+1. Распакуйте ZIP для Windows x64. Начните с варианта `compatible`. Оставьте `WinDivert.dll` и `WinDivert64.sys` рядом с `prizrak-core.exe`.
+2. Остановите старый zapret или `winws2`, если они запущены. Откройте командную строку от имени администратора в распакованной папке и выполните `prizrak-core.exe -d . -f config.yaml`.
+3. Укажите в браузере HTTP-прокси `127.0.0.1:17890`. Откройте и перемотайте видео на YouTube. Этот маршрут проверяет TLS по TCP. Для QUIC направьте UDP-трафик приложения в `ZAPRET2` через TUN или SOCKS5 UDP.
 
-Профиль `youtube-winws2.txt` использует YouTube-правила из [примера автора](https://github.com/bol-van/zapret-win-bundle/blob/6b4375fa04f6bd7017eec379e16e462d3ea8df66/zapret-winws/preset2_example.cmd) для TLS и QUIC. Действия применяются к хостам из `youtube-hosts.txt`. WinDivert перехватывает подходящий исходящий трафик всей системы, включая браузер и прямые соединения Prizrak-Core. Результат зависит от сети и провайдера.
+В `config.yaml` стратегии и профили задаются в `proxies[].zapret2.options` в порядке выполнения. `tcp-ports` и `udp-ports` задают порты подключения, которые обрабатывает этот outbound. `-t -d . -f config.yaml` проверяет стратегию, загрузку Lua и доступность драйвера.
 
-Для базового теста скачайте вариант `compatible`. Вариант `v3` рассчитан на процессоры с поддержкой x86-64-v3. Оба варианта используют одинаковый zapret2.
+В ядро встроены C-движок и Lua-библиотеки [zapret2 v1.0.7](https://github.com/bol-van/zapret2/releases/tag/v1.0.7). Пакеты обрабатываются в WebAssembly внутри `prizrak-core.exe`. Тестовый профиль использует TLS- и QUIC-правила из [примера автора](https://github.com/bol-van/zapret-win-bundle/blob/6b4375fa04f6bd7017eec379e16e462d3ea8df66/zapret-winws/preset2_example.cmd).
+
+Этот эксперимент перехватывает собственные TCP/UDP-соединения outbound. TCP-перехват включается после установления соединения, поэтому стратегии для SYN/SYN-ACK здесь недоступны. Модуль видит встроенные Lua-файлы и блобы. Имена хостов задаются через `--hostlist-domains`, пользовательский Lua можно передать строкой `--lua-init=...`. Отправка ограничена текущим соединением. Системные флаги `winws2`, IP-фрагментация и отправка в другие соединения не поддерживаются.
+
+Исходники зависимостей и лицензии доступны у [zapret2](https://github.com/bol-van/zapret2/tree/v1.0.7), [WinDivert](https://github.com/basil00/WinDivert/tree/v2.2.2), [Lua](https://www.lua.org/ftp/lua-5.4.8.tar.gz), [zlib](https://zlib.net/fossils/zlib-1.3.1.tar.gz) и [wasi-libc](https://github.com/WebAssembly/wasi-libc). Патч и сборка WASM находятся в `transport/zapret2/build` в исходниках Prizrak-Core.
