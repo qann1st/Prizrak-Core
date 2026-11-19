@@ -24,7 +24,7 @@ download wasi.tar.gz b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb098
 download lua.tar.gz 4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae \
     https://www.lua.org/ftp/lua-5.4.8.tar.gz
 download zlib.tar.gz 9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23 \
-    https://zlib.net/fossils/zlib-1.3.1.tar.gz
+    https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
 
 unzip -q "$cache/zapret2-v1.0.7.zip" -d "$work"
 for archive in wasi lua zlib; do
