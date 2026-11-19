@@ -464,7 +464,10 @@ jobs:
           body_path: release.md
 
   Docker:
-    if: ${{ !startsWith(github.event_name, 'pull_request') }}
+    # Release builds intentionally contain Windows amd64 artifacts only; the
+    # Dockerfile consumes Linux archives, so do not make tags or manual
+    # releases depend on a Docker image that cannot be assembled.
+    if: ${{ !startsWith(github.event_name, 'pull_request') && github.ref_type == 'branch' && (github.event_name != 'workflow_dispatch' || github.event.inputs.version == '') }}
     permissions: write-all
     needs: [build]
     runs-on: ubuntu-latest
