@@ -1,3 +1,85 @@
+--- a/conntrack.c
++++ b/conntrack.c
+@@ -253,7 +253,7 @@
+ 	return ConntrackPoolDoubleSearchPool(&p->pool, dis, ctrack, bReverse);
+ }
+ 
+-static bool ConntrackPoolFeedPool(t_conntrack_pool **pp, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse)
++static bool ConntrackPoolFeedPool(t_conntrack_pool **pp, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse, const bool *embedded_reverse)
+ {
+ 	t_conn conn, connswp;
+ 	t_conntrack_pool *ctr;
+@@ -276,10 +276,27 @@
+ 		}
+ 	}
+ 	b_rev = dis->tcp && tcp_synack_segment(dis->tcp);
+-	if ((dis->tcp && tcp_syn_segment(dis->tcp)) || b_rev || dis->udp)
++	// Prizrak attaches capture to an established socket and knows its
++	// direction even when the SYN and SYN-ACK were never captured.
++	bool established = embedded_reverse && dis->tcp &&
++		(dis->tcp->th_flags & (TH_SYN | TH_ACK | TH_FIN | TH_RST)) == TH_ACK;
++	if (established) b_rev = *embedded_reverse;
++	if ((dis->tcp && tcp_syn_segment(dis->tcp)) || b_rev || dis->udp || established)
+ 	{
+ 		if ((ctr = ConntrackNew(pp, b_rev ? &connswp : &conn)))
+ 		{
++			if (established)
++			{
++				t_ctrack_positions *pos = &ctr->track.pos;
++				t_ctrack_position *sender = b_rev ? &pos->server : &pos->client;
++				t_ctrack_position *peer = b_rev ? &pos->client : &pos->server;
++				uint32_t seq = ntohl(dis->tcp->th_seq), ack = ntohl(dis->tcp->th_ack);
++				pos->state = ESTABLISHED;
++				sender->seq0 = seq - 1;
++				peer->seq0 = ack - 1;
++				sender->uppos = sender->uppos_prev = seq;
++				peer->uppos = peer->uppos_prev = ack;
++			}
+ 			ConntrackFeedPacket(&ctr->track, b_rev, dis);
+ 			goto ok;
+ 		}
+@@ -293,8 +310,14 @@
+ }
+ bool ConntrackPoolFeed(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse)
+ {
+-	return ConntrackPoolFeedPool(&p->pool, dis, ctrack, bReverse);
++	return ConntrackPoolFeedPool(&p->pool, dis, ctrack, bReverse, NULL);
+ }
++#ifdef __wasi__
++bool ConntrackPoolFeedEmbedded(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse, bool incoming)
++{
++	return ConntrackPoolFeedPool(&p->pool, dis, ctrack, bReverse, &incoming);
++}
++#endif
+ 
+ static bool ConntrackPoolDropPool(t_conntrack_pool **pp, const struct dissect *dis)
+ {
+--- a/conntrack.h
++++ b/conntrack.h
+@@ -104,6 +104,9 @@
+ void ConntrackPoolInit(t_conntrack *p, time_t purge_interval, uint32_t timeout_syn, uint32_t timeout_established, uint32_t timeout_fin, uint32_t timeout_udp);
+ void ConntrackPoolDestroy(t_conntrack *p);
+ bool ConntrackPoolFeed(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse);
++#ifdef __wasi__
++bool ConntrackPoolFeedEmbedded(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse, bool incoming);
++#endif
+ // do not create, do not update. only find existing
+ bool ConntrackPoolDoubleSearch(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse);
+ bool ConntrackPoolDrop(t_conntrack *p, const struct dissect *dis);
+--- a/desync.c
++++ b/desync.c
+@@ -1281,7 +1281,11 @@
+ 		if (!params.ctrack_disable)
+ 		{
+ 			ConntrackPoolPurge(&params.conntrack);
++#ifdef __wasi__
++			if (ConntrackPoolFeedEmbedded(&params.conntrack, dis, &ps->ctrack, &ps->bReverse, ifin && *ifin))
++#else
+ 			if (ConntrackPoolFeed(&params.conntrack, dis, &ps->ctrack, &ps->bReverse))
++#endif
+ 			{
+ 				ps->dp = ps->ctrack->dp;
+ 				ps->ctrack_replay = ps->ctrack;
 --- a/darkmagic.c
 +++ b/darkmagic.c
 @@ -652,6 +652,10 @@
