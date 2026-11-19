@@ -31,7 +31,7 @@ jobs:
       - name: Build embedded zapret2
         run: |
           sudo apt-get update
-          sudo apt-get install -y libbsd-dev
+          sudo apt-get install -y libbsd-dev pkg-config
           bash transport/zapret2/build/build.sh "$RUNNER_TEMP/zapret2-licenses"
           go test -tags with_zapret2 ./transport/zapret2
       - name: Download pinned WinDivert
@@ -93,11 +93,20 @@ jobs:
           Expand-Archive -LiteralPath $archive -DestinationPath $testDirectory
           Copy-Item -LiteralPath zapret2.test.exe -Destination $testDirectory
           Set-Location -LiteralPath $testDirectory
-          & .\prizrak-core.exe -t -d . -f config.yaml
-          if ($LASTEXITCODE -ne 0) { throw 'Prizrak-Core configuration test failed' }
+          function Invoke-SmokeCheck([string] $Title, [string] $Executable, [string[]] $Arguments) {
+            $messages = & $Executable @Arguments 2>&1
+            $status = $LASTEXITCODE
+            $messages | Write-Host
+            if ($status -ne 0) {
+              $details = ($messages | Select-Object -Last 10) -join "`n"
+              $details = $details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+              Write-Host ('::error title={0}::{1}' -f $Title, $details)
+              exit $status
+            }
+          }
+          Invoke-SmokeCheck 'Prizrak-Core YAML' '.\prizrak-core.exe' @('-t', '-d', '.', '-f', 'config.yaml')
           $env:PRIZRAK_ZAPRET2_WIN_SMOKE = '1'
-          & .\zapret2.test.exe -test.v
-          if ($LASTEXITCODE -ne 0) { throw 'Embedded zapret2 loopback test failed' }
+          Invoke-SmokeCheck 'WinDivert loopback' '.\zapret2.test.exe' @('-test.v')
 
   publish:
     needs: [build, smoke-test]

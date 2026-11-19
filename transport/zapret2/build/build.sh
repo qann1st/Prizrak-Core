@@ -37,7 +37,8 @@ zlib="$work/zlib-1.3.1"
 sdk="$work/wasi-sdk-34.0-x86_64-linux"
 patch -d "$src" -p1 --fuzz=0 < "$here/upstream-wasi.patch"
 mkdir -p "$work/headers/sys" "$assets/files"
-cp /usr/include/bsd/sys/queue.h "$work/headers/sys/queue.h"
+libbsd_include=$(pkg-config --variable=includedir libbsd)
+cp "$libbsd_include/bsd/sys/queue.h" "$work/headers/sys/queue.h"
 lua_sources=()
 for file in "$lua"/l*.c; do
     case "${file##*/}" in
