@@ -2120,6 +2120,17 @@ proxies: # socks5
           # level: "6"
           # system: linux
           # network: tcp
+  # Zapret2 on Windows amd64. Requires WinDivert.dll, WinDivert64.sys and Administrator rights.
+  # Uncomment this outbound and route traffic to ZAPRET2 in rules. Options keep their upstream order.
+  # - name: ZAPRET2
+  #   type: zapret2
+  #   options:
+  #     - "--filter-tcp=443"
+  #     - "--filter-l7=tls"
+  #     - "--payload=tls_client_hello"
+  #     - "--lua-desync=fake:blob=fake_default_tls:repeats=6"
+  #   # assets-dir: zapret2    # Files are visible to Lua under /custom.
+
 proxy-groups:
   # url-test 将按照 url 测试结果使用延迟最低节点
   - name: "auto"

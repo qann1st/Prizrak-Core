@@ -147,6 +147,12 @@ func ParseProxy(mapping map[string]any, options ...ProxyOption) (C.Proxy, error)
 			break
 		}
 		proxy, err = outbound.NewFreedom(*freedomOption)
+	case "zapret2":
+		zapret2Option := &outbound.Zapret2Option{BasicOption: basicOption}
+		if err := decoder.Decode(mapping, zapret2Option); err != nil {
+			return nil, err
+		}
+		proxy, err = outbound.NewZapret2(*zapret2Option)
 	case "dns":
 		dnsOptions := &outbound.DnsOption{BasicOption: basicOption}
 		err = decoder.Decode(mapping, dnsOptions)
@@ -263,6 +269,9 @@ func ParseProxy(mapping map[string]any, options ...ProxyOption) (C.Proxy, error)
 	}
 	if muxOption.Enabled && muxCoolOption.Enabled {
 		return nil, fmt.Errorf("smux and mux.cool cannot be enabled together")
+	}
+	if proxyType == "zapret2" && (muxOption.Enabled || muxCoolOption.Enabled) {
+		return nil, fmt.Errorf("zapret2 does not support multiplexing")
 	}
 	if proxyType == "vless" && mapping["network"] == "xdrive" {
 		// As Xray-core refuses it: every connection would be a session of its
