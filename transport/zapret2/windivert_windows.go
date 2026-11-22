@@ -13,7 +13,7 @@ import (
 
 const (
 	windivertLayerNetwork     = 0
-	windivertPriority         = 1 // Keep selected flows ahead of Zapret v1's priority-zero handles.
+	windivertPriority         = 1
 	windivertParamQueueLength = 0
 	windivertParamQueueSize   = 2
 

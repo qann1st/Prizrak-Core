@@ -6,6 +6,7 @@ import (
 	"github.com/metacubex/mihomo/adapter/outbound"
 	"github.com/metacubex/mihomo/common/structure"
 	C "github.com/metacubex/mihomo/constant"
+	"github.com/metacubex/mihomo/log"
 )
 
 // The mux of Xray-core v26.11.9 for every outbound
@@ -145,6 +146,9 @@ func ParseProxy(mapping map[string]any, options ...ProxyOption) (C.Proxy, error)
 		err = decoder.Decode(mapping, freedomOption)
 		if err != nil {
 			break
+		}
+		if mapping["zapret"] != nil {
+			log.Warnln("[freedom] %s: ignoring removed zapret v1 block; migrate to type: zapret2 for packet processing", freedomOption.Name)
 		}
 		proxy, err = outbound.NewFreedom(*freedomOption)
 	case "zapret2":
